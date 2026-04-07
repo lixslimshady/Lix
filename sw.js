@@ -1,5 +1,6 @@
-const CACHE_NAME = 'lix-v7';
+const CACHE_NAME = 'lix-v4';
 
+// Cache the app shell on install
 self.addEventListener('install', function(e) {
   e.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
@@ -18,6 +19,7 @@ self.addEventListener('install', function(e) {
 });
 
 self.addEventListener('activate', function(e) {
+  // Remove old caches
   e.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(
@@ -29,18 +31,22 @@ self.addEventListener('activate', function(e) {
   self.clients.claim();
 });
 
+// Cache-first for same-origin, network-first for others
 self.addEventListener('fetch', function(e) {
   e.respondWith(
-    fetch(e.request).then(function(response) {
-      if (response && response.status === 200) {
-        var clone = response.clone();
-        caches.open(CACHE_NAME).then(function(cache) {
-          cache.put(e.request, clone);
-        });
-      }
-      return response;
-    }).catch(function() {
-      return caches.match(e.request);
+    caches.match(e.request).then(function(cached) {
+      if (cached) return cached;
+      return fetch(e.request).then(function(response) {
+        if (response && response.status === 200) {
+          var clone = response.clone();
+          caches.open(CACHE_NAME).then(function(cache) {
+            cache.put(e.request, clone);
+          });
+        }
+        return response;
+      }).catch(function() {
+        return cached;
+      });
     })
   );
 });
