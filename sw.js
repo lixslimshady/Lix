@@ -1,6 +1,5 @@
-const CACHE_NAME = 'lix-v6';
+const CACHE_NAME = 'lix-v7';
 
-// Cache the app shell on install
 self.addEventListener('install', function(e) {
   e.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
@@ -19,7 +18,6 @@ self.addEventListener('install', function(e) {
 });
 
 self.addEventListener('activate', function(e) {
-  // Remove old caches
   e.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(
@@ -31,7 +29,6 @@ self.addEventListener('activate', function(e) {
   self.clients.claim();
 });
 
-// Network-first: always try network, fall back to cache when offline
 self.addEventListener('fetch', function(e) {
   e.respondWith(
     fetch(e.request).then(function(response) {
@@ -43,7 +40,6 @@ self.addEventListener('fetch', function(e) {
       }
       return response;
     }).catch(function() {
-      // Network failed — serve from cache if available
       return caches.match(e.request);
     })
   );
