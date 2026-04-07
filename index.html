@@ -850,6 +850,20 @@
         </div>
       </div>
       <div class="trend-card">
+        <div class="trend-card-title">Finance</div>
+        <div class="settings-label">Configure finance and fee collection settings</div>
+        <div style="display:flex;align-items:center;gap:16px;margin-top:14px;flex-wrap:wrap;">
+          <div>
+            <div class="settings-label" style="margin-bottom:4px;">Currency Symbol</div>
+            <input id="settingsCurrency" class="modal-input" style="width:90px;" placeholder="$" maxlength="5"/>
+          </div>
+        </div>
+        <div style="font-size:.75rem;color:#3a6070;margin-top:10px;letter-spacing:.04em;">
+          The currency symbol is displayed on all fee and payment amounts in the Finance module.
+        </div>
+      </div>
+
+      <div class="trend-card">
         <div class="trend-card-title">Data Management</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
           <button class="btn-gold" onclick="exportData()">Backup Data</button>
@@ -1494,18 +1508,25 @@ function switchPage(name, btn){
 ══════════════════════════════════════════════ */
 let mySubjects = JSON.parse(localStorage.getItem('lix_my_subjects')) ||
   ['MATHS','ENGLISH','HISTORY','COMB. SCIENCE','AGRICULTURE','SHONA','COMMERCE','ACCOUNTS','HERITAGE','GEOGRAPHY'];
+let currencySymbol = localStorage.getItem('lix_currency') || '$';
 
 function saveSettings(){
   var checked = [...document.querySelectorAll('.subject-chip.selected')].map(function(c){ return c.dataset.subj; });
   if(!checked.length){ alert('Select at least one subject.'); return; }
   mySubjects = checked;
   localStorage.setItem('lix_my_subjects', JSON.stringify(mySubjects));
+  // Save finance settings
+  var cur = (document.getElementById('settingsCurrency')||{}).value;
+  if(cur !== undefined){
+    currencySymbol = cur.trim() || '$';
+    localStorage.setItem('lix_currency', currencySymbol);
+  }
   // Propagate to all parts of the system
   populateSubjectSelects();
   populateProgressSelects();
   renderSOWSubjectTabs();
   renderTrends();
-  renderClassProgress();
+  renderClassOverview();
   // Show inline confirmation
   var btn = document.querySelector('button[onclick="saveSettings()"]');
   if(btn){
@@ -1531,6 +1552,9 @@ function renderSubjectChips(){
     chip.onclick = function(){ chip.classList.toggle('selected'); };
     grid.appendChild(chip);
   });
+  // Populate finance settings
+  var cur = document.getElementById('settingsCurrency');
+  if(cur) cur.value = currencySymbol;
 }
 
 function populateSubjectSelects(){
@@ -2018,8 +2042,9 @@ function exportData(){
     students:   JSON.parse(localStorage.getItem('lix_students')   || '[]'),
     exercises:  JSON.parse(localStorage.getItem('lix_exercises')  || '[]'),
     sowEntries: JSON.parse(localStorage.getItem('lix_sow_entries')|| '[]'),
-    mySubjects: JSON.parse(localStorage.getItem('lix_my_subjects')|| '[]'),
-    sowFiles:   JSON.parse(localStorage.getItem('lix_sow_files')  || '[]'),
+    mySubjects:     JSON.parse(localStorage.getItem('lix_my_subjects')|| '[]'),
+    sowFiles:       JSON.parse(localStorage.getItem('lix_sow_files')  || '[]'),
+    currencySymbol: localStorage.getItem('lix_currency') || '$',
     exported:   new Date().toISOString()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
@@ -2045,8 +2070,9 @@ function importData(event){
         if(d.students)   localStorage.setItem('lix_students',    JSON.stringify(d.students));
         if(d.exercises)  localStorage.setItem('lix_exercises',   JSON.stringify(d.exercises));
         if(d.sowEntries) localStorage.setItem('lix_sow_entries', JSON.stringify(d.sowEntries));
-        if(d.mySubjects) localStorage.setItem('lix_my_subjects', JSON.stringify(d.mySubjects));
-        if(d.sowFiles)   localStorage.setItem('lix_sow_files',   JSON.stringify(d.sowFiles));
+        if(d.mySubjects)     localStorage.setItem('lix_my_subjects', JSON.stringify(d.mySubjects));
+        if(d.sowFiles)       localStorage.setItem('lix_sow_files',   JSON.stringify(d.sowFiles));
+        if(d.currencySymbol) localStorage.setItem('lix_currency',    d.currencySymbol);
       }
       // Reload to apply everything cleanly
       location.reload();
@@ -2639,7 +2665,7 @@ function balance(s){
   return totalFees(s) - totalPaid(s);
 }
 function fmt(n){
-  return '$' + Number(n).toFixed(2);
+  return currencySymbol + Number(n).toFixed(2);
 }
 
 /* ── Render finance dashboard ── */
