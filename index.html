@@ -1474,14 +1474,19 @@ function addNewStudent(){
    PAGE NAVIGATION
 ══════════════════════════════════════════════ */
 function switchPage(name, btn){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById('page-'+name).classList.add('active');
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
+  var pg = document.getElementById('page-'+name);
+  if(pg) pg.classList.add('active');
   if(btn) btn.classList.add('active');
-  if(name==='exercises') { populateSubjectSelects(); renderExerciseLog(); populateExMarksGrid(); }
-  if(name==='report')    { populateSubjectSelects(); }
-  if(name==='settings')  { renderSubjectChips(); }
-  if(name==='scheme')    { populateSubjectSelects(); renderSOWSubjectTabs(); }
+  if(name==='exercises')  { populateSubjectSelects(); renderExerciseLog(); populateExMarksGrid(); }
+  if(name==='report')     { populateSubjectSelects(); }
+  if(name==='scheme')     { populateSubjectSelects(); renderSOWSubjectTabs(); }
+  if(name==='attendance') { populateProgressSelects(); renderAttSheet(); }
+  if(name==='progress')   { populateProgressSelects(); renderProgressSheet(); }
+  if(name==='social')     { populateProgressSelects(); renderSocialSheet(); }
+  if(name==='finance')    { initFinanceData(); renderFinance(); }
+  if(name==='settings')   { renderSubjectChips(); }
 }
 
 /* ══════════════════════════════════════════════
