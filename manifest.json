@@ -1,0 +1,32 @@
+{
+  "name": "Lix Dashboard",
+  "short_name": "Lix",
+  "description": "Teacher intelligence dashboard \u2014 attendance, progress, schemes and more.",
+  "start_url": "/Lix/",
+  "scope": "/Lix/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#00d4ff",
+  "lang": "en",
+  "categories": [
+    "education",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": []
+}
