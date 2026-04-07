@@ -271,6 +271,45 @@
     transition:box-shadow .2s, filter .2s;
   }
   .btn-gold:hover { filter:brightness(1.1); box-shadow:0 0 24px rgba(255,215,0,0.4); }
+  /* ── FINANCE ── */
+  .fin-card {
+    background:var(--panel); border:1px solid var(--border);
+    border-radius:6px; padding:14px 18px;
+    display:flex; align-items:center; gap:14px;
+    transition:background .15s; cursor:pointer;
+  }
+  .fin-card:hover { background:var(--panel-mid); }
+  .fin-student-name { font-size:.95rem; color:#ddf4ff; font-weight:600; letter-spacing:.03em; }
+  .fin-student-class { font-size:.72rem; color:var(--cyan-deep); letter-spacing:.1em; text-transform:uppercase; margin-top:2px; }
+  .fin-amounts { display:flex; gap:18px; align-items:center; flex-wrap:wrap; }
+  .fin-amount-cell { text-align:center; }
+  .fin-amount-label { font-size:.62rem; letter-spacing:.16em; text-transform:uppercase; color:var(--cyan-deep); }
+  .fin-amount-val { font-size:.95rem; font-weight:700; letter-spacing:.04em; margin-top:2px; }
+  .fin-owing  { color:#ff7070; }
+  .fin-paid   { color:#00e080; }
+  .fin-over   { color:#ffd700; }
+  .fin-summary-card {
+    background:var(--panel); border:1px solid var(--border);
+    border-radius:6px; padding:16px;
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+  }
+  .fin-summary-label { font-size:.65rem; letter-spacing:.22em; text-transform:uppercase; color:var(--cyan-deep); }
+  .fin-summary-val { font-size:1.3rem; font-weight:700; letter-spacing:.04em; }
+  .fin-pay-row {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:8px 10px; background:var(--panel-mid);
+    border:1px solid var(--border); border-radius:3px; margin-bottom:5px;
+    font-size:.82rem;
+  }
+  .fin-badge {
+    font-size:.62rem; letter-spacing:.14em; text-transform:uppercase;
+    padding:3px 8px; border-radius:2px; white-space:nowrap;
+  }
+  .fin-badge-cash  { background:rgba(0,212,255,0.1); border:1px solid rgba(0,212,255,0.3); color:var(--cyan-bright); }
+  .fin-badge-eco   { background:rgba(0,200,100,0.1); border:1px solid rgba(0,200,100,0.3); color:#00e080; }
+  .fin-badge-bank  { background:rgba(255,215,0,0.1); border:1px solid rgba(255,215,0,0.3); color:#ffd700; }
+  .fin-badge-swipe { background:rgba(180,100,255,0.1); border:1px solid rgba(180,100,255,0.3); color:#b464ff; }
+  .fin-badge-zipit { background:rgba(255,140,0,0.1); border:1px solid rgba(255,140,0,0.3); color:#ff8c00; }
   /* ── QUICK ACTION BUTTONS ── */
   .qa-btn {
     padding:4px 10px; border-radius:3px; border:1px solid var(--border);
@@ -488,6 +527,7 @@
       <button class="nav-tab" onclick="switchPage('report',this)">Weekly Report</button>
       <button class="nav-tab" onclick="switchPage('attendance',this)">Attendance</button>
       <button class="nav-tab" onclick="switchPage('progress',this)">Progress</button>
+      <button class="nav-tab" onclick="switchPage('finance',this)">Finance</button>
       <button class="nav-tab" onclick="switchPage('social',this)">Social Records</button>
       <button class="nav-tab" onclick="switchPage('settings',this)">Settings</button>
     </nav>
@@ -725,6 +765,40 @@
 
       <!-- Sheet -->
       <div id="progressSheetWrap" style="overflow-x:auto;background:var(--panel);border:1px solid var(--border);border-radius:6px;"></div>
+    </div>
+
+    <!-- ══ PAGE: FINANCE ══ -->
+    <div id="page-finance" class="page">
+      <div class="section-head">Finance</div>
+
+      <!-- Summary cards -->
+      <div id="financeSummary" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:4px;"></div>
+
+      <!-- Controls -->
+      <div class="trend-card" style="margin-bottom:0;">
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+          <div>
+            <div class="modal-section-label" style="margin-top:0;">Class</div>
+            <select id="finClassFilter" class="trend-select" onchange="renderFinance()">
+              <option value="All">All Classes</option>
+            </select>
+          </div>
+          <div>
+            <div class="modal-section-label" style="margin-top:0;">Status</div>
+            <select id="finStatusFilter" class="trend-select" onchange="renderFinance()">
+              <option value="All">All</option>
+              <option value="Owing">Owing</option>
+              <option value="Paid">Fully Paid</option>
+              <option value="Overpaid">Overpaid</option>
+            </select>
+          </div>
+          <div style="flex:1;"></div>
+          <button class="btn-gold" onclick="openAddFeeModal()">+ Add Fee Structure</button>
+        </div>
+      </div>
+
+      <!-- Student finance list -->
+      <div id="financeList"></div>
     </div>
 
     <!-- ══ PAGE: SOCIAL RECORDS ══ -->
@@ -2521,6 +2595,274 @@ function saveBulkScores(){
   if(saved) alert(saved + ' scores saved for ' + subj + '.');
 }
 
+/* ══════════════════════════════════════════════
+   FINANCE MODULE
+   Each student gets:
+     fees:     [{name, amount, term}]
+     payments: [{amount, date, method, ref}]
+══════════════════════════════════════════════ */
+
+/* ── Safely init finance arrays on all students ── */
+function initFinanceData(){
+  students.forEach(function(s){
+    if(!s.fees)     s.fees     = [];
+    if(!s.payments) s.payments = [];
+  });
+  saveData();
+}
+
+/* ── Calculations ── */
+function totalFees(s){
+  return (s.fees||[]).reduce(function(a,f){ return a + Number(f.amount); }, 0);
+}
+function totalPaid(s){
+  return (s.payments||[]).reduce(function(a,p){ return a + Number(p.amount); }, 0);
+}
+function balance(s){
+  return totalFees(s) - totalPaid(s);
+}
+function fmt(n){
+  return '$' + Number(n).toFixed(2);
+}
+
+/* ── Render finance dashboard ── */
+function renderFinance(){
+  var clsFilter    = (document.getElementById('finClassFilter')   ||{}).value||'All';
+  var statusFilter = (document.getElementById('finStatusFilter')  ||{}).value||'All';
+  var list         = document.getElementById('financeList');
+  var summary      = document.getElementById('financeSummary');
+  if(!list) return;
+
+  // Populate class filter
+  var cf = document.getElementById('finClassFilter');
+  if(cf && cf.options.length <= 1){
+    var classes = [...new Set(students.map(function(s){ return s.class; }))].sort();
+    classes.forEach(function(c){
+      var o = document.createElement('option');
+      o.value = c; o.textContent = c;
+      cf.appendChild(o);
+    });
+  }
+
+  // Filter students
+  var filtered = students.filter(function(s){
+    if(clsFilter !== 'All' && s.class !== clsFilter) return false;
+    var bal = balance(s);
+    if(statusFilter === 'Owing'    && bal <= 0)  return false;
+    if(statusFilter === 'Paid'     && bal !== 0) return false;
+    if(statusFilter === 'Overpaid' && bal >= 0)  return false;
+    return true;
+  });
+
+  // Summary cards
+  var totalFeesAll  = students.reduce(function(a,s){ return a+totalFees(s); }, 0);
+  var totalPaidAll  = students.reduce(function(a,s){ return a+totalPaid(s); }, 0);
+  var totalBal      = totalFeesAll - totalPaidAll;
+  var owingCount    = students.filter(function(s){ return balance(s)>0; }).length;
+  var paidCount     = students.filter(function(s){ return balance(s)<=0 && totalFees(s)>0; }).length;
+
+  summary.innerHTML =
+    finSummaryCard('Total Levied',   fmt(totalFeesAll), '#ffd700') +
+    finSummaryCard('Total Received', fmt(totalPaidAll), '#00e080') +
+    finSummaryCard('Outstanding',    fmt(totalBal>0?totalBal:0), '#ff7070') +
+    finSummaryCard('Owing',          owingCount + ' students', '#ff7070') +
+    finSummaryCard('Cleared',        paidCount  + ' students', '#00e080');
+
+  if(!filtered.length){
+    list.innerHTML = '<div style="color:#3a6070;font-style:italic;font-size:.85rem;padding:12px 0;">No students match the current filter.</div>';
+    return;
+  }
+
+  // Sort: owing first
+  filtered.sort(function(a,b){ return balance(b) - balance(a); });
+
+  list.innerHTML = '';
+  filtered.forEach(function(s){
+    var fees = totalFees(s);
+    var paid = totalPaid(s);
+    var bal  = fees - paid;
+    var balCls = bal > 0 ? 'fin-owing' : bal < 0 ? 'fin-over' : 'fin-paid';
+    var balLabel = bal > 0 ? 'Owing' : bal < 0 ? 'Overpaid' : 'Cleared';
+
+    var card = document.createElement('div');
+    card.className = 'fin-card';
+    card.innerHTML =
+      '<div style="flex:1;min-width:0;">' +
+        '<div class="fin-student-name">' + s.name + '</div>' +
+        '<div class="fin-student-class">' + s.class + '</div>' +
+      '</div>' +
+      '<div class="fin-amounts">' +
+        '<div class="fin-amount-cell"><div class="fin-amount-label">Fees</div><div class="fin-amount-val" style="color:#ffd700;">' + fmt(fees) + '</div></div>' +
+        '<div class="fin-amount-cell"><div class="fin-amount-label">Paid</div><div class="fin-amount-val" style="color:#00e080;">' + fmt(paid) + '</div></div>' +
+        '<div class="fin-amount-cell"><div class="fin-amount-label">Balance</div><div class="fin-amount-val ' + balCls + '">' + fmt(Math.abs(bal)) + '</div></div>' +
+        '<div class="fin-amount-cell"><div class="fin-amount-label">Status</div><div class="fin-amount-val ' + balCls + '" style="font-size:.72rem;letter-spacing:.1em;">' + balLabel + '</div></div>' +
+      '</div>' +
+      '<button class="btn-gold" onclick="event.stopPropagation();openFinanceModal(' + s.id + ')" style="padding:7px 14px;font-size:.72rem;white-space:nowrap;">Manage</button>';
+    card.onclick = function(){ openFinanceModal(s.id); };
+    list.appendChild(card);
+  });
+}
+
+function finSummaryCard(label, val, color){
+  return '<div class="fin-summary-card">' +
+    '<div class="fin-summary-label">' + label + '</div>' +
+    '<div class="fin-summary-val" style="color:' + color + ';">' + val + '</div>' +
+    '</div>';
+}
+
+/* ── Finance Modal ── */
+var financeModalStudent = null;
+
+function openFinanceModal(id){
+  var s = students.find(function(st){ return st.id===id; });
+  if(!s) return;
+  financeModalStudent = s;
+  if(!s.fees)     s.fees=[];
+  if(!s.payments) s.payments=[];
+
+  document.getElementById('finModalName').textContent  = s.name;
+  document.getElementById('finModalClass').textContent = s.class;
+
+  // Set today's date on payment input
+  document.getElementById('paymentDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('paymentAmount').value = '';
+  document.getElementById('paymentRef').value = '';
+
+  refreshFinanceModal();
+  document.getElementById('financeModal').style.display = 'flex';
+}
+
+function refreshFinanceModal(){
+  var s    = financeModalStudent;
+  var fees = totalFees(s);
+  var paid = totalPaid(s);
+  var bal  = fees - paid;
+  var balCol = bal > 0 ? '#ff7070' : bal < 0 ? '#ffd700' : '#00e080';
+
+  document.getElementById('finModalFees').textContent    = fmt(fees);
+  document.getElementById('finModalPaid').textContent    = fmt(paid);
+  document.getElementById('finModalBalance').textContent = fmt(Math.abs(bal)) + (bal>0?' owing':bal<0?' credit':' cleared');
+  document.getElementById('finModalBalance').style.color = balCol;
+
+  // Fee list
+  var fl = document.getElementById('finModalFeeList');
+  if(!s.fees.length){
+    fl.innerHTML = '<div style="color:#3a6070;font-style:italic;font-size:.82rem;">No fees added yet.</div>';
+  } else {
+    fl.innerHTML = s.fees.map(function(f, i){
+      return '<div class="fin-pay-row">' +
+        '<div><div style="color:#ddf4ff;font-size:.88rem;">' + f.name + '</div>' +
+        '<div style="font-size:.7rem;color:var(--cyan-deep);">' + f.term + '</div></div>' +
+        '<div style="display:flex;align-items:center;gap:10px;">' +
+        '<span style="color:#ffd700;font-weight:600;">' + fmt(f.amount) + '</span>' +
+        '<button onclick="deleteFeeItem(' + i + ')" style="background:none;border:1px solid rgba(255,80,80,0.3);color:#ff7070;border-radius:3px;padding:2px 8px;font-size:.65rem;cursor:pointer;">✕</button>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  // Payment history
+  var pl = document.getElementById('finModalPayments');
+  if(!s.payments.length){
+    pl.innerHTML = '<div style="color:#3a6070;font-style:italic;font-size:.82rem;">No payments recorded yet.</div>';
+  } else {
+    var sorted = s.payments.slice().sort(function(a,b){ return b.date.localeCompare(a.date); });
+    pl.innerHTML = sorted.map(function(p, i){
+      var badgeCls = p.method==='Cash'?'fin-badge-cash':p.method==='EcoCash'?'fin-badge-eco':p.method==='Bank Transfer'?'fin-badge-bank':p.method==='Swipe'?'fin-badge-swipe':'fin-badge-zipit';
+      return '<div class="fin-pay-row">' +
+        '<div>' +
+          '<div style="color:#00e080;font-weight:600;font-size:.92rem;">' + fmt(p.amount) + '</div>' +
+          '<div style="font-size:.7rem;color:var(--cyan-deep);">' + p.date + (p.ref?' · '+p.ref:'') + '</div>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;">' +
+        '<span class="fin-badge ' + badgeCls + '">' + p.method + '</span>' +
+        '<button onclick="deletePayment(' + i + ')" style="background:none;border:1px solid rgba(255,80,80,0.3);color:#ff7070;border-radius:3px;padding:2px 8px;font-size:.65rem;cursor:pointer;">✕</button>' +
+        '</div></div>';
+    }).join('');
+  }
+}
+
+function closeFinanceModal(){
+  document.getElementById('financeModal').style.display = 'none';
+  financeModalStudent = null;
+  renderFinance();
+}
+
+/* ── Add fee item to individual student ── */
+function addFeeItem(){
+  var s      = financeModalStudent;
+  var name   = (document.getElementById('feeItemName')  ||{}).value.trim();
+  var amount = parseFloat((document.getElementById('feeItemAmount')||{}).value);
+  var term   = (document.getElementById('feeItemTerm')  ||{}).value;
+  if(!name||isNaN(amount)||amount<=0){ alert('Enter fee name and amount.'); return; }
+  s.fees.push({ name:name, amount:amount, term:term });
+  saveData();
+  document.getElementById('feeItemName').value   = '';
+  document.getElementById('feeItemAmount').value = '';
+  refreshFinanceModal();
+}
+
+function deleteFeeItem(idx){
+  if(!confirm('Remove this fee item?')) return;
+  financeModalStudent.fees.splice(idx,1);
+  saveData();
+  refreshFinanceModal();
+}
+
+/* ── Add payment ── */
+function addPayment(){
+  var s      = financeModalStudent;
+  var amount = parseFloat((document.getElementById('paymentAmount')||{}).value);
+  var method = (document.getElementById('paymentMethod')||{}).value;
+  var date   = (document.getElementById('paymentDate')  ||{}).value || new Date().toISOString().split('T')[0];
+  var ref    = ((document.getElementById('paymentRef')  ||{}).value||'').trim();
+  if(isNaN(amount)||amount<=0){ alert('Enter a valid payment amount.'); return; }
+  s.payments.push({ amount:amount, date:date, method:method, ref:ref });
+  saveData();
+  document.getElementById('paymentAmount').value = '';
+  document.getElementById('paymentRef').value    = '';
+  refreshFinanceModal();
+}
+
+function deletePayment(idx){
+  if(!confirm('Remove this payment record?')) return;
+  var sorted = financeModalStudent.payments.slice().sort(function(a,b){ return b.date.localeCompare(a.date); });
+  var target = sorted[idx];
+  var realIdx = financeModalStudent.payments.indexOf(target);
+  if(realIdx > -1) financeModalStudent.payments.splice(realIdx,1);
+  saveData();
+  refreshFinanceModal();
+}
+
+/* ── Bulk fee: apply to whole class ── */
+function openAddFeeModal(){
+  var modal = document.getElementById('addFeeModal');
+  var sel   = document.getElementById('bulkFeeClass');
+  var classes = [...new Set(students.map(function(s){ return s.class; }))].sort();
+  sel.innerHTML = classes.map(function(c){ return '<option value="'+c+'">'+c+'</option>'; }).join('');
+  modal.style.display = 'flex';
+}
+function closeAddFeeModal(){
+  document.getElementById('addFeeModal').style.display = 'none';
+}
+function applyBulkFee(){
+  var cls    = (document.getElementById('bulkFeeClass')  ||{}).value;
+  var term   = (document.getElementById('bulkFeeTerm')   ||{}).value;
+  var name   = ((document.getElementById('bulkFeeName')  ||{}).value||'').trim();
+  var amount = parseFloat((document.getElementById('bulkFeeAmount')||{}).value);
+  if(!name||isNaN(amount)||amount<=0){ alert('Enter fee name and amount.'); return; }
+  var group = students.filter(function(s){ return s.class===cls; });
+  group.forEach(function(s){
+    if(!s.fees) s.fees=[];
+    // Don't duplicate
+    var exists = s.fees.find(function(f){ return f.name===name&&f.term===term; });
+    if(!exists) s.fees.push({ name:name, amount:amount, term:term });
+  });
+  saveData();
+  closeAddFeeModal();
+  renderFinance();
+  alert('Fee "'+name+'" ('+fmt(amount)+') applied to '+group.length+' students in '+cls+'.');
+}
+
 /* ══ SIDEBAR TOGGLE ══ */
 function toggleSidebar(){
   const sb=document.getElementById("sidebar");
@@ -2548,6 +2890,7 @@ function initialize(){
 
   populateSubjectSelects();
   renderExerciseLog();
+  initFinanceData();
   populateProgressSelects();
   renderPriorityView();
   renderClassOverview();
@@ -2555,6 +2898,140 @@ function initialize(){
 }
 initialize();
 </script>
+<!-- ══ FINANCE MODAL ══ -->
+<div id="financeModal" style="
+  position:fixed;inset:0;background:rgba(0,0,0,0.85);
+  display:none;justify-content:center;align-items:center;
+  z-index:300;backdrop-filter:blur(4px);">
+  <div class="modal-box" style="width:480px;max-height:88vh;overflow-y:auto;">
+    <div class="modal-header">
+      <div class="modal-name" id="finModalName">Finance</div>
+      <button class="modal-close" onclick="closeFinanceModal()">&#x2715;</button>
+    </div>
+    <div id="finModalClass" class="modal-meta"></div>
+
+    <!-- Balance summary -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:14px 0;">
+      <div class="trend-summary-cell">
+        <div class="trend-summary-subj">Total Fees</div>
+        <div id="finModalFees" class="trend-summary-val" style="color:#ffd700;"></div>
+      </div>
+      <div class="trend-summary-cell">
+        <div class="trend-summary-subj">Total Paid</div>
+        <div id="finModalPaid" class="trend-summary-val" style="color:var(--cyan-bright);"></div>
+      </div>
+      <div class="trend-summary-cell">
+        <div class="trend-summary-subj">Balance</div>
+        <div id="finModalBalance" class="trend-summary-val"></div>
+      </div>
+    </div>
+
+    <!-- Fees breakdown -->
+    <div class="modal-section-label">Fee Structure</div>
+    <div id="finModalFeeList" style="margin-bottom:14px;"></div>
+
+    <!-- Add fee item -->
+    <div style="background:var(--panel-mid);border:1px solid var(--border);border-radius:4px;padding:12px;margin-bottom:14px;">
+      <div style="font-size:.68rem;letter-spacing:.22em;text-transform:uppercase;color:var(--cyan-deep);margin-bottom:10px;">Add Fee Item</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div>
+          <div class="modal-section-label" style="margin-top:0;">Description</div>
+          <input id="feeItemName" class="modal-input" style="margin:0;" placeholder="e.g. Tuition Fee"/>
+        </div>
+        <div>
+          <div class="modal-section-label" style="margin-top:0;">Amount ($)</div>
+          <input type="number" id="feeItemAmount" class="modal-input" style="margin:0;" placeholder="0.00" min="0"/>
+        </div>
+      </div>
+      <div style="margin-bottom:8px;">
+        <div class="modal-section-label" style="margin-top:0;">Term</div>
+        <select id="feeItemTerm" class="trend-select" style="width:100%;">
+          <option value="Term 1 2026">Term 1 2026</option>
+          <option value="Term 2 2026">Term 2 2026</option>
+          <option value="Term 3 2026">Term 3 2026</option>
+          <option value="Annual 2026">Annual 2026</option>
+        </select>
+      </div>
+      <button class="btn-cyan" onclick="addFeeItem()" style="width:100%;">Add Fee Item</button>
+    </div>
+
+    <!-- Payment history -->
+    <div class="modal-section-label">Payment History</div>
+    <div id="finModalPayments" style="margin-bottom:14px;max-height:180px;overflow-y:auto;"></div>
+
+    <!-- Add payment -->
+    <div style="background:var(--panel-mid);border:1px solid var(--border);border-radius:4px;padding:12px;">
+      <div style="font-size:.68rem;letter-spacing:.22em;text-transform:uppercase;color:var(--cyan-deep);margin-bottom:10px;">Record Payment</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+        <div>
+          <div class="modal-section-label" style="margin-top:0;">Amount ($)</div>
+          <input type="number" id="paymentAmount" class="modal-input" style="margin:0;" placeholder="0.00" min="0.01"/>
+        </div>
+        <div>
+          <div class="modal-section-label" style="margin-top:0;">Method</div>
+          <select id="paymentMethod" class="trend-select" style="width:100%;">
+            <option value="Cash">Cash</option>
+            <option value="EcoCash">EcoCash</option>
+            <option value="Bank Transfer">Bank Transfer</option>
+            <option value="Swipe">Swipe</option>
+            <option value="ZIPIT">ZIPIT</option>
+          </select>
+        </div>
+        <div>
+          <div class="modal-section-label" style="margin-top:0;">Date</div>
+          <input type="date" id="paymentDate" class="modal-input" style="margin:0;"/>
+        </div>
+      </div>
+      <div style="margin-bottom:10px;">
+        <div class="modal-section-label" style="margin-top:0;">Reference / Note (optional)</div>
+        <input id="paymentRef" class="modal-input" style="margin:0;" placeholder="e.g. Receipt #1234"/>
+      </div>
+      <button class="btn-gold" onclick="addPayment()" style="width:100%;">Save Payment</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ADD FEE STRUCTURE MODAL ══ -->
+<div id="addFeeModal" style="
+  position:fixed;inset:0;background:rgba(0,0,0,0.85);
+  display:none;justify-content:center;align-items:center;
+  z-index:300;backdrop-filter:blur(4px);">
+  <div class="modal-box" style="width:460px;">
+    <div class="modal-header">
+      <div class="modal-name">Add Fee Structure</div>
+      <button class="modal-close" onclick="closeAddFeeModal()">&#x2715;</button>
+    </div>
+    <div style="font-size:.82rem;color:#6ab0c0;margin-bottom:14px;">Apply a fee to an entire class at once.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+      <div>
+        <div class="modal-section-label" style="margin-top:0;">Class</div>
+        <select id="bulkFeeClass" class="trend-select" style="width:100%;"></select>
+      </div>
+      <div>
+        <div class="modal-section-label" style="margin-top:0;">Term</div>
+        <select id="bulkFeeTerm" class="trend-select" style="width:100%;">
+          <option value="Term 1 2026">Term 1 2026</option>
+          <option value="Term 2 2026">Term 2 2026</option>
+          <option value="Term 3 2026">Term 3 2026</option>
+          <option value="Annual 2026">Annual 2026</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+      <div>
+        <div class="modal-section-label" style="margin-top:0;">Fee Name</div>
+        <input id="bulkFeeName" class="modal-input" style="margin:0;" placeholder="e.g. Tuition Fee"/>
+      </div>
+      <div>
+        <div class="modal-section-label" style="margin-top:0;">Amount ($)</div>
+        <input type="number" id="bulkFeeAmount" class="modal-input" style="margin:0;" placeholder="0.00" min="0"/>
+      </div>
+    </div>
+    <div style="font-size:.75rem;color:#3a6070;margin-bottom:12px;">This will add the fee to every student in the selected class. Existing fees are not affected.</div>
+    <button class="btn-gold" onclick="applyBulkFee()" style="width:100%;">Apply to Class</button>
+  </div>
+</div>
+
 <!-- ══ BULK SCORE MODAL ══ -->
 <div id="bulkModal" style="
   position:fixed;inset:0;background:rgba(0,0,0,0.82);
