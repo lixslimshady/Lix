@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lix-v4';
+const CACHE_NAME = 'lix-v5';
 
 // Cache the app shell on install
 self.addEventListener('install', function(e) {
